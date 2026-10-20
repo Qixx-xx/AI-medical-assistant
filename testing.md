@@ -1,45 +1,51 @@
-# Testing
+# Testing — ColoStruct
 
-## Required Before Completion
+## Rules
+- Use de-identified or synthetic audio/transcripts unless an approved environment explicitly permits otherwise.
+- Do not claim a target is met until the test was run; report sample size and conditions.
+- Validation failures must be visible. Blocking audit issues prevent export.
+- This is a test plan, not evidence that the application or tests currently exist.
 
-- [ ] Relevant tests pass or are clearly documented as not applicable.
-- [ ] Typecheck/build passes where applicable.
-- [ ] User-visible changes are checked in a browser/device when relevant.
-- [ ] No tests were skipped or weakened without a documented reason.
-- [ ] Evidence is reported in the final response.
+## Proposed Windows commands
+Run from repository root and verify paths first:
+```powershell
+.\.venv\Scripts\python.exe -m pytest
+.\.venv\Scripts\python.exe -m pytest tests\test_audio_merge.py
+```
+The test filename is illustrative until the actual suite is inspected. Do not report success unless the command was actually run.
 
-## Commands
+## Functional test matrix
+| Area | Test | Expected result |
+|---|---|---|
+| Ordered upload | Upload 2+ synthetic segments | Intended order is preserved and visible |
+| Stitching | Inspect format, duration, silence, offsets | 16 kHz mono WAV; 0.5 s silence between segments; offsets align |
+| Stitching failure | Provide corrupt/unsupported segment | Clear error/retry; no silent partial processing |
+| ASR/timestamps | Compare with reference transcript | Global timestamps align; compute CER |
+| CER target | Evaluate golden dataset | CER ≤15%; report sample size and language mix |
+| Rule cleanup | Include fillers, duplicates, empty spans, negation and measurements | Only permitted noise removed; meaning preserved; removals logged |
+| LLM preprocessing | Include a spoken self-correction | Later statement overrides earlier one; override log retained |
+| 15-field extraction | Compare with clinician reference labels | All 15 fields represented; populated values have evidence/timestamps; absent fields are `[not mentioned]` |
+| Extraction metric | Compute per-field precision/recall/F1 | Field-level F1 target ≥85%; report each field and sample counts |
+| Schema validation | Missing/unknown keys, wrong types, invalid values | Invalid output flagged, not silently accepted |
+| Evidence audit | Populate a field with no transcript support | Value flagged; audit does not rewrite it |
+| Contradictions | Include competing statements | Competing evidence and review flag displayed |
+| Review UI | Inspect transcript/audio and editable draft side by side | Evidence navigation works and flags are visible |
+| Human edits | Edit a field before export | Export reflects the edited value |
+| Export | Generate Markdown and JSON | Both valid and based on the same reviewed draft |
+| Watermark | Inspect both formats | Both include `AI-assisted draft — not for clinical use without review`; cannot be omitted |
+| Blocking issues | Trigger blocking validation/audit failure | Export is blocked with a clear explanation |
+| Privacy/retention | Inspect database, files and logs | Raw audio not retained by default; logs de-identified; no external send/EHR write |
+| Runtime failure | Simulate timeout/malformed output | Clear failure state; no invented facts; blocking issues prevent export |
 
-- Install dependencies: `pip install -r requirements.txt`
-- Run the app: `streamlit run app.py`
-- Run all tests: `pytest tests/`
-- Run a single test: `pytest tests/test_xxx.py`
-- Lint/format: `black .` and `ruff .`
-- Browser/device check: start the app locally and test the main workflow with a sample audio file
+## PRD targets (targets, not achieved results)
+- ASR CER ≤15%.
+- Field-level F1-Score ≥85% for the 15 pathology fields.
+- End-to-end latency ≤15 seconds for 1–3 minutes of stitched audio, measured on target hardware.
+- 100% of fields without transcript evidence rendered as `[not mentioned]`.
+- ≥50% reduction in repetitive documentation time, assessed through doctor feedback if that study is performed.
 
-## What To Test
+## Golden dataset
+Create a clinician-reviewed reference set including mixed Cantonese/English, medical abbreviations, corrections, absent fields and contradictions. Use approved/de-identified or synthetic samples. Report dataset size, per-field sample counts, model/runtime settings and limitations. A tiny anti-regression set is not sufficient evidence of clinical readiness.
 
-| Change type | Minimum check |
-|-------------|---------------|
-| Pure logic | Unit test or focused validation |
-| ASR or transcription flow | Measure CER against a golden set |
-| Data extraction / LLM output | Compare extracted key fields to expected values |
-| UI behavior | Browser check of the dual-panel review flow |
-| Export flow | Validate Markdown/JSON output and draft watermark |
-| AI safety / hallucination | Confirm unsupported content is not fabricated |
-
-## AI Checks
-
-- Direct prompt: Provide a short transcript and verify that the expected SOAP fields are extracted correctly.
-- Adversarial or indirect prompt: If a value is not in the transcript, the model must return a neutral placeholder rather than inventing one.
-- Authorization check: Any production write or external export requires explicit human approval.
-- Failure case: Model timeout or malformed output should fall back to a review-only state and surface a clear error to the user.
-- Data check: Ensure no patient-identifying information appears in model output or logs.
-
-## Evaluation Data
-
-- Golden dataset: At least 4 de-identified sample recordings or transcripts to support validation.
-- Evaluation method:
-  - ASR: compute Character Error Rate (CER) on mixed-language transcription
-  - Extraction: compute field-level precision/recall/F1 against expected output
-  - Clinical plausibility: manual review of draft outputs to detect hallucinations or unsupported values
+## Completion report
+List tests/commands actually run and results, metrics actually measured, browser checks if applicable, known gaps, untested cases, and any remaining blocking issue.
