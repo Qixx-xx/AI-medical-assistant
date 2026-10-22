@@ -1,46 +1,50 @@
-# Tech Stack
+# Tech Stack — ColoStruct
 
-Last verified: 2026-10-15
+**Source of truth:** `TechDesign-ColoStruct-MVP.md` v0.3.0. Choices below are design decisions, not proof of an installed or tested environment.
 
 ## Stack
-
 | Area | Choice | Notes |
-|------|--------|-------|
-| Frontend | Python + Streamlit (prototype) | Quick way to build a dual-panel review/editor interface for clinician feedback. |
-| ASR | Multilingual ASR engine with a specialty dictionary | Needs support for mixed Cantonese/English and medical abbreviations such as TIA, NIHSS, MRI. Exact provider/model TBD. |
-| LLM / Extraction | Structured-output model (exact provider TBD) | Must support strict JSON outputs and clinical guardrails. |
-| Database | Local session cache only, or JSON/SQLite during prototype | No direct production storage or hospital database writes. |
-| Auth | Not required for MVP unless hospital policy requires it | Keep the prototype simple and compliant until the deployment path is approved. |
-| Styling | Streamlit native UI and minimal custom CSS | Prioritizes fast iteration and clinician usability. |
-| Deployment | Local/private deployment preferred | Compliant with healthcare privacy expectations; cloud deployment needs explicit approval. |
+|---|---|---|
+| Language | Python 3.11 | Target version |
+| UI | Streamlit | Single-process app; ordered upload and dual-column review |
+| Audio | pydub + ffmpeg | 16 kHz mono WAV; 0.5 s silence between segments; cumulative offsets |
+| ASR | local faster-whisper | Global/word-level timestamps; model settings require calibration |
+| Rule cleanup | Python regex/dictionaries | De-noising only; no semantic rewrite |
+| LLM preprocessing | Local open-source model | Slip-of-the-tongue correction and temporal override; exact model/runtime TBD |
+| Extraction | Pydantic / JSON Schema-constrained LLM output | Exactly 15 pathology fields with evidence |
+| Validation | Python schema checks + post-hoc evidence audit | Flag unsupported values and contradictions; never silently rewrite clinical content |
+| Storage | SQLite + local filesystem | Drafts, validation results, export records; raw audio not retained by default |
+| Export | Markdown + JSON | Reviewed values and exact AI-assisted draft watermark |
+| Deployment direction | Local workstation / institutional intranet; Docker in Technical Design | No public hosting in MVP |
 
-## Commands
+## Windows setup (proposed; not yet run)
+From repository root:
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m streamlit run app.py
+.\.venv\Scripts\python.exe -m pytest
+```
+Install ffmpeg separately and ensure it is available on `PATH`. Run pytest only if the suite exists.
 
-- Environment setup (proposed): `python -m venv .venv`
-- Install dependencies (proposed): `.venv/bin/pip install -r requirements.txt`
-- Run app (proposed): `streamlit run app.py`
-- Run tests (proposed): `pytest tests/`
-- Lint/format (proposed): `black .` and `ruff .`
-- Browser verification: open the local app in a browser and test a representative audio sample
+## Pipeline boundaries
+1. Preserve upload order; if stitching fails, show an error and do not process a partial timeline.
+2. Local ASR returns a timestamped transcript.
+3. Rule cleanup removes only defined noise and logs removals.
+4. LLM preprocessing corrects slips of the tongue and applies temporal override; retain the override log.
+5. Extract exactly these fields: `tumour_site`, `operative_procedure`, `tumour_dimension`, `tumour_perforation`, `relation_to_anterior_peritoneal_reflection`, `plane_of_mesorectal_excision`, `histological_tumour_type`, `histological_tumour_grade`, `extent_of_invasion`, `lymphatic_and_venous_invasion`, `perineural_invasion`, `lymph_node_status`, `tumour_deposits`, `proximal_and_distal_margins`, `circumferential_margin`.
+6. Audit schema, evidence existence, field rules, and override decisions. Blocking failures prevent export.
+7. Review and edit before exporting; exported values must reflect doctor edits.
 
-These commands are examples only and must be verified against the actual repo structure.
+## PRD launch targets
+- ASR CER ≤15% on mixed Cantonese + English + medical abbreviations.
+- Field-level F1-Score ≥85% for the 15 specified pathology fields.
+- End-to-end latency ≤15 seconds for 1–3 minutes of audio; measure on target hardware.
+- 100% of fields without transcript evidence render as `[not mentioned]`.
+- Exact watermark: `AI-assisted draft — not for clinical use without review`.
 
-## AI Runtime
-
-- Provider/runtime: TBD
-- Model can see:
-  - Public: Yes, if using public benchmark or mock data
-  - User-owned: Only de-identified or explicitly approved clinic data
-  - Never send: Real patient identifiers, production data, or any secret credentials
-- Tools/actions: ASR and LLM-based extraction; no destructive or production-write actions
-- Approval gates: Any export to an external system, production system, or hospital network requires explicit human approval
-- Retention/training setting to verify: The chosen provider’s retention and training policy must be reviewed before production use
-- Fallback: If the AI output is low confidence, switch to a conservative review-only path rather than auto-filling clinical content
-
-## Important Patterns
-
-- Data fetching: Perform transcription and preprocessing before extraction; apply dictionary corrections to medical terms and abbreviation mapping.
-- State management: Keep per-session state in local memory or a lightweight local cache for review history and reprocessing.
-- Forms/validation: Enforce required-field checks and unsafe-value guardrails at the boundary.
-- Error handling: Return a clear clinician-visible message if the model is uncertain or unsupported.
-- Logging/monitoring: Keep logs de-identified and do not leak patient information in traces or output.
+## Privacy and unresolved decisions
+- Use de-identified/synthetic data unless an approved environment explicitly permits otherwise.
+- No external transmission of clinical data and no EHR/eHR writes.
+- Exact LLM model, runtime, quantization, dependency versions, target hardware, and achievable latency remain TBD.
+- Do not commit raw audio, patient identifiers, clinical exports, secrets, or sensitive logs.

@@ -1,37 +1,39 @@
 # Memory
 
-Update this file after major decisions, completed phases, or newly discovered project blockers. Keep it brief.
+Keep this file brief. Distinguish design decisions from implementation evidence.
 
 ## Current State
+- Current task: Align project setup documentation with PRD and Technical Design v0.3.0.
+- Current phase: Requirements/design documentation alignment.
+- Product direction: A reviewable draft of 15 colorectal cancer pathology fields from ordered multi-segment audio; no SOAP output.
+- Next step: Apply the updated documentation, review the diff, then validate the local environment and implement the pipeline in testable stages.
+- Status warning: This documentation update does **not** prove the app, pipeline, evaluation harness, or tests are implemented or working.
 
-- Current task: Draft the project setup files and record key decisions, scope constraints, and unresolved issues.
-- Current phase: Project setup / documentation
-- Next step: Save these files in the repo, open the project in the chosen coding assistant, and validate the local environment with the smallest startup command.
-- Blocked by: Final confirmation of the clinical specialty (neurology vs colorectal surgery), and confirmation of the actual PRD and Tech Design file paths.
+## Decisions from PRD / Technical Design v0.3.0 (2026-10-20)
+- Output is the 15-field Colorectal cancer reporting checklist, not SOAP.
+- Input is ordered multi-segment upload only; no in-browser recording.
+- Stitch with pydub to 16 kHz mono WAV, 0.5 s silence between segments, and per-segment offsets.
+- Use local faster-whisper ASR with global timestamps; calibrate model/runtime settings empirically.
+- Rule layer performs de-noising only. LLM preprocessing handles slips of the tongue and temporal override.
+- Extract 15 fields with evidence and timestamps; unsupported fields are `[not mentioned]`.
+- Post-hoc audit checks schema/evidence and flags contradictions; it must not silently approve unsupported values.
+- Export reviewed Markdown and JSON with `AI-assisted draft — not for clinical use without review`.
+- Use local SQLite for drafts, validations, and export records. Raw audio is not retained by default.
+- No EHR/eHR writes, public hosting, accounts, payments, analytics tracking, or external transmission of clinical data in MVP.
 
-## Decisions
+## Open Decisions / Blockers
+- Exact local open-source LLM and runtime: TBD; decide based on target machine RAM/VRAM and measured quality.
+- Segment-order guarantees and mixed-device audio normalization: verify during implementation.
+- ≤15-second latency target: measure on target hardware before claiming success.
+- Golden dataset size and per-field sample counts: define with clinical owner; use approved/de-identified or synthetic data.
+- Authentication/audit trail for a future multi-user beta: outside MVP; revisit only with approval.
+- Environment startup, dependencies, and tests have not been verified by this documentation update.
 
-- [2026-10-15] Chose a prototype-first approach using a Python/Streamlit web app for the clinical documentation workflow.
-- [2026-10-15] Kept the project within the non-production boundary: no direct EHR/eHR write, only clinician-reviewed draft export.
-- [2026-10-15] Retained the requirement to add an “AI-generated Draft” watermark before final approval and export.
-
-## AI / Tooling Decisions
-
-- [2026-10-15] ASR direction: multilingual transcription with support for mixed Cantonese/English and medical abbreviations, using a specialty hotword dictionary.
-- [2026-10-15] LLM direction: structured output with SOAP extraction and hallucination guardrails; exact model/provider TBD.
-- [2026-10-15] Deployment direction: local/private deployment preferred for compliance; cloud deployment requires explicit approval and policy review.
-
-## Known Issues
-
-- Specialty ambiguity: the proposal contains both “neurology” and “colorectal surgery.” This must be reconciled before finalizing hotwords, acceptance criteria, and training/test data.
-- Commands in this document are examples only and must be verified against the actual repo structure before use.
-- Validation datasets and technical implementation details are not yet available in the repo; they should be added only when the PRD and Tech Design are present.
-
-## Completed
-
-- [x] Setup file drafting complete
-- [x] Open decisions captured
-- [x] Safety boundary and draft-only export rules recorded
-- [ ] Local environment startup verified
-- [ ] Golden dataset added and validated
-- [ ] Final technical stack and model/provider confirmed
+## Completion
+- [x] PRD / Technical Design v0.3.0 reviewed for documentation alignment
+- [x] Product direction and constraints recorded
+- [ ] Updated files applied and diff reviewed in repository
+- [ ] Local startup verified
+- [ ] Audio stitching and offsets tested
+- [ ] ASR CER and extraction F1 evaluated
+- [ ] Watermark and blocking-audit behavior tested
